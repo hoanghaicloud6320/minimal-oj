@@ -6,6 +6,13 @@
 #include <sstream>
 #include <stdexcept>
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 namespace moj {
 
 namespace {
@@ -159,13 +166,94 @@ int JudgeService::runExecutableWithRedirects(const std::filesystem::path& execut
                                              int timeLimitMs,
                                              const std::string& argument) {
 #ifdef _WIN32
-    (void)timeLimitMs;
+    SECURITY_ATTRIBUTES security;
+    security.nLength = sizeof(SECURITY_ATTRIBUTES);
+    security.lpSecurityDescriptor = nullptr;
+    security.bInheritHandle = TRUE;
+
+    HANDLE inputHandle = CreateFileW(input.wstring().c_str(),
+                                     GENERIC_READ,
+                                     FILE_SHARE_READ,
+                                     &security,
+                                     OPEN_EXISTING,
+                                     FILE_ATTRIBUTE_NORMAL,
+                                     nullptr);
+    HANDLE outputHandle = CreateFileW(output.wstring().c_str(),
+                                      GENERIC_WRITE,
+                                      FILE_SHARE_READ,
+                                      &security,
+                                      CREATE_ALWAYS,
+                                      FILE_ATTRIBUTE_NORMAL,
+                                      nullptr);
+    HANDLE errorHandle = CreateFileW(error.wstring().c_str(),
+                                     GENERIC_WRITE,
+                                     FILE_SHARE_READ,
+                                     &security,
+                                     CREATE_ALWAYS,
+                                     FILE_ATTRIBUTE_NORMAL,
+                                     nullptr);
+    if (inputHandle == INVALID_HANDLE_VALUE || outputHandle == INVALID_HANDLE_VALUE || errorHandle == INVALID_HANDLE_VALUE) {
+        if (inputHandle != INVALID_HANDLE_VALUE) {
+            CloseHandle(inputHandle);
+        }
+        if (outputHandle != INVALID_HANDLE_VALUE) {
+            CloseHandle(outputHandle);
+        }
+        if (errorHandle != INVALID_HANDLE_VALUE) {
+            CloseHandle(errorHandle);
+        }
+        return 1;
+    }
+
+    STARTUPINFOW startup;
+    ZeroMemory(&startup, sizeof(startup));
+    startup.cb = sizeof(startup);
+    startup.dwFlags = STARTF_USESTDHANDLES;
+    startup.hStdInput = inputHandle;
+    startup.hStdOutput = outputHandle;
+    startup.hStdError = errorHandle;
+
+    PROCESS_INFORMATION process;
+    ZeroMemory(&process, sizeof(process));
+
     std::string command = quote(executable);
     if (!argument.empty()) {
         command += " " + quoteString(argument);
     }
-    command += " < " + quote(input) + " > " + quote(output) + " 2> " + quote(error);
-    return runCommand("cmd /S /C \"" + command + "\"");
+    std::wstring wideCommand(command.begin(), command.end());
+    std::vector<wchar_t> mutableCommand(wideCommand.begin(), wideCommand.end());
+    mutableCommand.push_back(L'\0');
+
+    BOOL created = CreateProcessW(nullptr,
+                                  mutableCommand.data(),
+                                  nullptr,
+                                  nullptr,
+                                  TRUE,
+                                  CREATE_NO_WINDOW,
+                                  nullptr,
+                                  nullptr,
+                                  &startup,
+                                  &process);
+    CloseHandle(inputHandle);
+    CloseHandle(outputHandle);
+    CloseHandle(errorHandle);
+    if (!created) {
+        return 1;
+    }
+
+    DWORD waitCode = WaitForSingleObject(process.hProcess, static_cast<DWORD>(timeLimitMs));
+    DWORD exitCode = 1;
+    if (waitCode == WAIT_TIMEOUT) {
+        TerminateProcess(process.hProcess, 124);
+        WaitForSingleObject(process.hProcess, INFINITE);
+        exitCode = 124;
+    } else {
+        GetExitCodeProcess(process.hProcess, &exitCode);
+    }
+
+    CloseHandle(process.hThread);
+    CloseHandle(process.hProcess);
+    return static_cast<int>(exitCode);
 #else
     std::string command = "timeout " + std::to_string((timeLimitMs + 999) / 1000) + "s " + quote(executable);
     if (!argument.empty()) {
