@@ -303,6 +303,8 @@
     const $ = (id) => document.getElementById(id);
     const statusBox = $("status");
     let selectedSlug = "";
+    let statusLines = [];
+    let requestSeq = 0;
 
     const example = {
       slug: "sum-a-b",
@@ -337,18 +339,73 @@ int main() {
     cout << a + b << '\\n';
 }`;
 
-    function setStatus(value) {
-      statusBox.textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+    function formatValue(value) {
+      return typeof value === "string" ? value : JSON.stringify(value, null, 2);
     }
 
-    async function api(path, options = {}) {
-      const res = await fetch(path, {
-        headers: { "Content-Type": "application/json" },
-        ...options
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || res.statusText);
-      return json;
+    function nowText() {
+      return new Date().toLocaleTimeString("vi-VN", { hour12: false });
+    }
+
+    function renderStatus(extra = "") {
+      statusBox.textContent = statusLines.join("\n") + (extra ? `\n${extra}` : "");
+    }
+
+    function setStatus(value) {
+      statusLines = [`[${nowText()}] ${formatValue(value)}`];
+      renderStatus();
+    }
+
+    function appendStatus(message) {
+      statusLines.push(`[${nowText()}] ${message}`);
+      renderStatus();
+    }
+
+    function showResult(value) {
+      renderStatus(`\nKết quả:\n${formatValue(value)}`);
+    }
+
+    function handleError(error) {
+      if (!error.logged) {
+        appendStatus(`Lỗi: ${error.message || error}`);
+      }
+    }
+
+    async function api(path, options = {}, label = "Request") {
+      const { log = true, ...fetchOptions } = options;
+      const method = fetchOptions.method || "GET";
+      const requestId = ++requestSeq;
+      const started = performance.now();
+      if (log) {
+        statusLines = [`[${nowText()}] #${requestId} ${label}`];
+        appendStatus(`Đã gửi: ${method} ${path}`);
+        appendStatus("Đang đợi server trả lời...");
+      }
+      try {
+        const res = await fetch(path, {
+          headers: { "Content-Type": "application/json" },
+          ...fetchOptions
+        });
+        const text = await res.text();
+        const json = text ? JSON.parse(text) : {};
+        const elapsed = Math.round(performance.now() - started);
+        if (log) {
+          appendStatus(`Server trả lời: HTTP ${res.status} sau ${elapsed}ms`);
+        }
+        if (!res.ok) {
+          throw new Error(json.error || res.statusText);
+        }
+        if (log) {
+          appendStatus("Hoàn tất.");
+        }
+        return json;
+      } catch (error) {
+        if (log) {
+          appendStatus(`Lỗi request: ${error.message || error}`);
+          error.logged = true;
+        }
+        throw error;
+      }
     }
 
     function readForm() {
@@ -373,8 +430,8 @@ int main() {
       $("submitSlug").value = problem.slug || "";
     }
 
-    async function loadProblems() {
-      const data = await api("/api/problems");
+    async function loadProblems(silent = false) {
+      const data = await api("/api/problems", { log: !silent }, "Tải danh sách bài");
       const list = $("problemList");
       list.innerHTML = "";
       if (!data.problems.length) {
@@ -391,36 +448,36 @@ int main() {
     }
 
     async function loadProblem(slug) {
-      const data = await api(`/api/problems/${encodeURIComponent(slug)}`);
+      const data = await api(`/api/problems/${encodeURIComponent(slug)}`, {}, `Mở bài ${slug}`);
       fillForm(data);
-      setStatus(`Đã mở bài ${slug}.`);
-      await loadProblems();
+      showResult(`Đã mở bài ${slug}.`);
+      await loadProblems(true);
     }
 
     async function saveProblem() {
       const body = readForm();
       const method = selectedSlug && selectedSlug === body.slug ? "PUT" : "POST";
       const path = method === "PUT" ? `/api/problems/${encodeURIComponent(body.slug)}` : "/api/problems";
-      const data = await api(path, { method, body: JSON.stringify(body) });
+      const data = await api(path, { method, body: JSON.stringify(body) }, `${method === "PUT" ? "Cập nhật" : "Tạo"} bài ${body.slug || "(chưa có slug)"}`);
       fillForm(data);
-      setStatus(data);
-      await loadProblems();
+      showResult(data);
+      await loadProblems(true);
     }
 
     async function refreshProblem() {
       const slug = $("slug").value.trim();
       if (!slug) throw new Error("Cần slug trước khi refresh.");
-      const data = await api(`/api/problems/${encodeURIComponent(slug)}/refresh`, { method: "POST", body: "{}" });
-      setStatus(data);
+      const data = await api(`/api/problems/${encodeURIComponent(slug)}/refresh`, { method: "POST", body: "{}" }, `Refresh testcase cho ${slug}`);
+      showResult(data);
     }
 
     async function deleteProblem() {
       const slug = $("slug").value.trim();
       if (!slug) throw new Error("Cần slug để xóa.");
-      await api(`/api/problems/${encodeURIComponent(slug)}`, { method: "DELETE", body: "{}" });
+      await api(`/api/problems/${encodeURIComponent(slug)}`, { method: "DELETE", body: "{}" }, `Xóa bài ${slug}`);
       fillForm({});
-      setStatus(`Đã xóa ${slug}.`);
-      await loadProblems();
+      showResult(`Đã xóa ${slug}.`);
+      await loadProblems(true);
     }
 
     async function submitCode() {
@@ -431,8 +488,8 @@ int main() {
           participant: $("participant").value.trim() || "anonymous",
           source_code: $("sourceCode").value
         })
-      });
-      setStatus(data);
+      }, `Submit bài ${slug}`);
+      showResult(data);
     }
 
     document.querySelectorAll(".tab").forEach((tab) => {
@@ -446,11 +503,11 @@ int main() {
     });
 
     $("newProblem").onclick = () => fillForm({});
-    $("reload").onclick = () => loadProblems().catch((e) => setStatus(e.message));
-    $("saveProblem").onclick = () => saveProblem().catch((e) => setStatus(e.message));
-    $("refreshProblem").onclick = () => refreshProblem().catch((e) => setStatus(e.message));
-    $("deleteProblem").onclick = () => deleteProblem().catch((e) => setStatus(e.message));
-    $("submitCode").onclick = () => submitCode().catch((e) => setStatus(e.message));
+    $("reload").onclick = () => loadProblems().catch(handleError);
+    $("saveProblem").onclick = () => saveProblem().catch(handleError);
+    $("refreshProblem").onclick = () => refreshProblem().catch(handleError);
+    $("deleteProblem").onclick = () => deleteProblem().catch(handleError);
+    $("submitCode").onclick = () => submitCode().catch(handleError);
     $("loadExample").onclick = () => { fillForm(example); setStatus("Đã nạp ví dụ A+B. Bấm Lưu bài rồi Refresh testcase."); };
     $("loadSolution").onclick = () => { $("sourceCode").value = solution; };
 
