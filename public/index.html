@@ -759,7 +759,13 @@ int main() {
     }
 
     async function submitCode() {
-      const slug = $("submitSlug").value.trim();
+      const btn = $("submitCode");
+      if (btn.disabled) return;
+      btn.disabled = true;
+      btn.textContent = "Đang gửi...";
+
+      try {
+        const slug = $("submitSlug").value.trim();
       const data = await api(`/api/problems/${encodeURIComponent(slug)}/submit`, {
         method: "POST",
         body: JSON.stringify({
@@ -769,6 +775,12 @@ int main() {
       }, `Submit bài ${slug}`);
       showResult(data);
       await loadRecentSubmissions(true);
+      } finally {
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.textContent = "Submit";
+        }, 5000);
+    }
     }
 
     async function loadRecentSubmissions(silent = false) {
