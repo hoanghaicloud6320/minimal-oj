@@ -28,7 +28,7 @@ cmake --build build
 .\build\minimal_oj.exe
 ```
 
-Open <http://127.0.0.1:8080>.
+Open <http://localhost:3335>.
 
 If Drogon is installed through MSYS2 UCRT64, run the commands inside the UCRT64 shell or make sure the CMake package paths are visible.
 

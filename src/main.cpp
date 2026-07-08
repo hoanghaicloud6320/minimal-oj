@@ -22,7 +22,7 @@ int main() {
         moj::Server::registerRoutes();
 
         drogon::app()
-            .addListener("127.0.0.1", 8080)
+            .addListener("0.0.0.0", 3335)
             .setThreadNum(2)
             .run();
     } catch (const std::exception& error) {
