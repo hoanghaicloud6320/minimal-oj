@@ -53,6 +53,7 @@ struct SubmissionSummary {
     std::string verdict;
     std::string submittedAt;
     std::string resultJson;
+    std::string sourceCode;
 };
 
 struct RefreshResult {
@@ -69,3 +70,4 @@ struct RuntimePaths {
 };
 
 } // namespace moj
+

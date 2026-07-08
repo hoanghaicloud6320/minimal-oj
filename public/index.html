@@ -790,6 +790,8 @@ int main() {
           const tone = label === "AC" ? "verdict-ac" : label === "WA" || label === "FAIL" ? "verdict-wa" : "verdict-tle";
           return `<span class="verdict ${tone}">#${escapeHtml(test.index)} ${escapeHtml(label)}</span>`;
         }).join("");
+
+        const codeId = `code-${item.id}`;
         row.innerHTML = `
           <div class="submission-head">
             <span class="verdict ${verdictClass(item.verdict)}">${escapeHtml(item.verdict)}</span>
@@ -799,6 +801,10 @@ int main() {
           </div>
           <div class="submission-meta">#${escapeHtml(item.id)} · ${escapeHtml(item.submitted_at)}</div>
           <div class="submission-cases">${caseHtml || '<span class="submission-meta">Không có case detail.</span>'}</div>
+          ${item.source_code ? `
+            <button onclick="document.getElementById('${codeId}').hidden = !document.getElementById('${codeId}').hidden">Show code preview</button>
+            <pre id="${codeId}" hidden style="background:#f4f4f4; padding:10px; font-size:12px; overflow:auto;">${escapeHtml(item.source_code)}</pre>
+          ` : ''}
         `;
         list.appendChild(row);
       }

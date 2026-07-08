@@ -105,6 +105,9 @@ inline Json::Value submissionSummaryToJson(const SubmissionSummary& submission) 
     if (!submission.resultJson.empty()) {
         root["result"] = parseJson(submission.resultJson);
     }
+    if (!submission.sourceCode.empty()) {
+        root["source_code"] = submission.sourceCode.substr(0, 10240);
+    }
     return root;
 }
 
@@ -117,3 +120,4 @@ inline Json::Value refreshResultToJson(const RefreshResult& result) {
 }
 
 } // namespace moj
+

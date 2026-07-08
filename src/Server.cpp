@@ -145,6 +145,7 @@ drogon::Task<drogon::HttpResponsePtr> Server::submit(drogon::HttpRequestPtr req,
         submission.total = result.total;
         submission.verdict = verdictFor(result);
         submission.resultJson = jsonToString(resultJson);
+        submission.sourceCode = source;
         submission.id = problemService_->recordSubmission(submission);
         resultJson["submission_id"] = Json::Int64(submission.id);
         resultJson["verdict"] = submission.verdict;
@@ -223,3 +224,4 @@ drogon::HttpResponsePtr Server::errorResponse(const std::string& message, drogon
 }
 
 } // namespace moj
+
