@@ -38,6 +38,7 @@ void ProblemRepository::initialize() {
             total INTEGER NOT NULL,
             verdict TEXT NOT NULL,
             result_json TEXT NOT NULL,
+            source_code TEXT NOT NULL DEFAULT '',
             submitted_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
     )sql");
@@ -131,8 +132,8 @@ std::optional<ProblemSummary> ProblemRepository::findProblem(const std::string& 
 long long ProblemRepository::recordSubmission(const SubmissionSummary& submission) {
     sqlite3_stmt* stmt = nullptr;
     const char* sql = R"sql(
-        INSERT INTO submissions(problem_slug, participant, passed, total, verdict, result_json, submitted_at)
-        VALUES (?, ?, ?, ?, ?, ?, datetime('now'));
+        INSERT INTO submissions(problem_slug, participant, passed, total, verdict, result_json, source_code, submitted_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'));
     )sql";
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
         throw std::runtime_error(sqlite3_errmsg(db_));
@@ -143,6 +144,7 @@ long long ProblemRepository::recordSubmission(const SubmissionSummary& submissio
     sqlite3_bind_int(stmt, 4, submission.total);
     sqlite3_bind_text(stmt, 5, submission.verdict.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 6, submission.resultJson.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 7, submission.sourceCode.c_str(), -1, SQLITE_TRANSIENT);
     if (sqlite3_step(stmt) != SQLITE_DONE) {
         std::string error = sqlite3_errmsg(db_);
         sqlite3_finalize(stmt);
@@ -155,7 +157,7 @@ long long ProblemRepository::recordSubmission(const SubmissionSummary& submissio
 std::vector<SubmissionSummary> ProblemRepository::listRecentSubmissions(int limit) const {
     sqlite3_stmt* stmt = nullptr;
     const char* sql = R"sql(
-        SELECT id, problem_slug, participant, passed, total, verdict, submitted_at, result_json
+        SELECT id, problem_slug, participant, passed, total, verdict, submitted_at, result_json, source_code
         FROM submissions
         ORDER BY submitted_at DESC, id DESC
         LIMIT ?;
@@ -176,6 +178,7 @@ std::vector<SubmissionSummary> ProblemRepository::listRecentSubmissions(int limi
         item.verdict = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
         item.submittedAt = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 6));
         item.resultJson = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 7));
+        item.sourceCode = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 8));
         submissions.push_back(std::move(item));
     }
     sqlite3_finalize(stmt);
@@ -192,3 +195,4 @@ void ProblemRepository::exec(const std::string& sql) const {
 }
 
 } // namespace moj
+
