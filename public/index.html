@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minimal OJ</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fb;
+      --panel: #ffffff;
+      --text: #172033;
+      --muted: #68728a;
+      --line: #dfe4ee;
+      --primary: #2457d6;
+      --primary-soft: #eaf0ff;
+      --danger: #b42318;
+      --ok: #087443;
+      --warn: #9a6700;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      padding: 18px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+    h1, h2, h3 { margin: 0; }
+    h1 { font-size: 22px; }
+    h2 { font-size: 18px; margin-bottom: 12px; }
+    h3 { font-size: 15px; margin-bottom: 8px; }
+    p { color: var(--muted); line-height: 1.5; margin: 6px 0; }
+    main {
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      min-height: calc(100vh - 69px);
+    }
+    aside {
+      border-right: 1px solid var(--line);
+      background: var(--panel);
+      padding: 18px;
+      overflow: auto;
+    }
+    section { padding: 18px; }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 16px;
+      overflow-x: auto;
+    }
+    .tab {
+      border: 0;
+      background: transparent;
+      padding: 10px 12px;
+      color: var(--muted);
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .tab.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+      font-weight: 650;
+    }
+    .problem-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .problem-item {
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 8px;
+      padding: 10px;
+      cursor: pointer;
+    }
+    .problem-item.active {
+      border-color: var(--primary);
+      background: var(--primary-soft);
+    }
+    .slug { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    label {
+      display: grid;
+      gap: 6px;
+      color: #344054;
+      font-size: 13px;
+      font-weight: 650;
+    }
+    input, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      font: inherit;
+      background: #fff;
+      color: var(--text);
+    }
+    textarea {
+      min-height: 180px;
+      font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+      font-size: 13px;
+      resize: vertical;
+    }
+    .tall { min-height: 310px; }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 14px 0;
+    }
+    button {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      padding: 9px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 650;
+    }
+    button.primary {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+    button.danger {
+      color: var(--danger);
+      border-color: #f0b7b2;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+    .status {
+      white-space: pre-wrap;
+      font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+      font-size: 13px;
+      background: #101828;
+      color: #eef4ff;
+      padding: 12px;
+      border-radius: 8px;
+      min-height: 44px;
+      overflow: auto;
+    }
+    .guide {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .guide div {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fff;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 12px;
+      font-weight: 700;
+      background: #eef2f6;
+      color: #344054;
+    }
+    .ok { color: var(--ok); }
+    .bad { color: var(--danger); }
+    @media (max-width: 920px) {
+      main { grid-template-columns: 1fr; }
+      aside { border-right: 0; border-bottom: 1px solid var(--line); }
+      .grid, .guide { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Minimal OJ</h1>
+      <p>OJ nội bộ cho participant tin cậy: tạo bài, refresh test, nộp code, so khớp token.</p>
+    </div>
+    <span class="badge">localhost:8080</span>
+  </header>
+
+  <main>
+    <aside>
+      <div class="actions">
+        <button class="primary" id="newProblem">Bài mới</button>
+        <button id="reload">Tải lại</button>
+      </div>
+      <div id="problemList" class="problem-list"></div>
+    </aside>
+
+    <section>
+      <div class="tabs">
+        <button class="tab active" data-tab="teacher">Giáo viên</button>
+        <button class="tab" data-tab="student">Học viên</button>
+        <button class="tab" data-tab="guide">Workflow</button>
+      </div>
+
+      <div id="teacherTab">
+        <div class="panel">
+          <h2>CRUD bài</h2>
+          <div class="grid">
+            <label>Slug
+              <input id="slug" placeholder="sum-a-b">
+            </label>
+            <label>Tiêu đề
+              <input id="title" placeholder="Tổng hai số">
+            </label>
+          </div>
+          <label>config.json
+            <textarea id="configJson"></textarea>
+          </label>
+          <label>statement.md
+            <textarea id="statementMd" class="tall"></textarea>
+          </label>
+          <div class="grid">
+            <label>gentest.cpp
+              <textarea id="gentestCpp" class="tall"></textarea>
+            </label>
+            <label>gen_answer_from_test.cpp
+              <textarea id="answerCpp" class="tall"></textarea>
+            </label>
+          </div>
+          <div class="actions">
+            <button class="primary" id="saveProblem">Lưu bài</button>
+            <button id="refreshProblem">Refresh testcase</button>
+            <button class="danger" id="deleteProblem">Xóa bài</button>
+            <button id="loadExample">Nạp ví dụ A+B</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="studentTab" hidden>
+        <div class="panel">
+          <h2>Nộp bài</h2>
+          <div class="grid">
+            <label>Slug bài
+              <input id="submitSlug" placeholder="sum-a-b">
+            </label>
+            <label>Tên participant
+              <input id="participant" placeholder="team-1">
+            </label>
+          </div>
+          <label>main.cpp
+            <textarea id="sourceCode" class="tall"></textarea>
+          </label>
+          <div class="actions">
+            <button class="primary" id="submitCode">Submit</button>
+            <button id="loadSolution">Nạp lời giải mẫu</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="guideTab" hidden>
+        <div class="panel">
+          <h2>Workflow đề xuất</h2>
+          <div class="guide">
+            <div>
+              <h3>1. Tạo bài</h3>
+              <p>Điền slug, đề Markdown, config, generator test và generator đáp án. Slug là định danh dùng trong URL và thư mục lưu bài.</p>
+            </div>
+            <div>
+              <h3>2. Refresh testcase</h3>
+              <p>Server compile `gentest.cpp` và `gen_answer_from_test.cpp`, sinh lại toàn bộ `.in/.ans` trong thư mục bài.</p>
+            </div>
+            <div>
+              <h3>3. Submit</h3>
+              <p>Học viên dán code C++20. Server compile bằng `g++`, chạy từng test, rồi so sánh token output với đáp án.</p>
+            </div>
+          </div>
+          <p>Trust model: code được chạy trực tiếp trên máy chủ nội bộ. Dễ dùng trước, sandbox/container để mở rộng sau.</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Kết quả</h2>
+        <div id="status" class="status">Sẵn sàng.</div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const statusBox = $("status");
+    let selectedSlug = "";
+
+    const example = {
+      slug: "sum-a-b",
+      title: "Tổng hai số",
+      config_json: JSON.stringify({ test_count: 5, time_limit_ms: 1000, memory_limit_mb: 256 }, null, 2),
+      statement_md: "# Tổng hai số\n\nCho hai số nguyên `a b`. In ra `a + b`.\n\n## Input\n\nMột dòng gồm hai số nguyên.\n\n## Output\n\nTổng của hai số.",
+      gentest_cpp: `#include <bits/stdc++.h>
+using namespace std;
+
+int main(int argc, char** argv) {
+    int id = argc > 1 ? atoi(argv[1]) : 1;
+    long long a = id * 10;
+    long long b = id * id;
+    cout << a << ' ' << b << '\\n';
+}`,
+      gen_answer_from_test_cpp: `#include <bits/stdc++.h>
+using namespace std;
+
+int main() {
+    long long a, b;
+    cin >> a >> b;
+    cout << a + b << '\\n';
+}`
+    };
+
+    const solution = `#include <bits/stdc++.h>
+using namespace std;
+
+int main() {
+    long long a, b;
+    cin >> a >> b;
+    cout << a + b << '\\n';
+}`;
+
+    function setStatus(value) {
+      statusBox.textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+    }
+
+    async function api(path, options = {}) {
+      const res = await fetch(path, {
+        headers: { "Content-Type": "application/json" },
+        ...options
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || res.statusText);
+      return json;
+    }
+
+    function readForm() {
+      return {
+        slug: $("slug").value.trim(),
+        title: $("title").value.trim(),
+        config_json: $("configJson").value,
+        statement_md: $("statementMd").value,
+        gentest_cpp: $("gentestCpp").value,
+        gen_answer_from_test_cpp: $("answerCpp").value
+      };
+    }
+
+    function fillForm(problem) {
+      selectedSlug = problem.slug || "";
+      $("slug").value = problem.slug || "";
+      $("title").value = problem.title || "";
+      $("configJson").value = problem.config_json || JSON.stringify(problem.config || {}, null, 2);
+      $("statementMd").value = problem.statement_md || "";
+      $("gentestCpp").value = problem.gentest_cpp || "";
+      $("answerCpp").value = problem.gen_answer_from_test_cpp || "";
+      $("submitSlug").value = problem.slug || "";
+    }
+
+    async function loadProblems() {
+      const data = await api("/api/problems");
+      const list = $("problemList");
+      list.innerHTML = "";
+      if (!data.problems.length) {
+        list.innerHTML = "<p>Chưa có bài nào. Bấm “Bài mới” hoặc “Nạp ví dụ A+B”.</p>";
+        return;
+      }
+      for (const item of data.problems) {
+        const button = document.createElement("button");
+        button.className = "problem-item" + (item.slug === selectedSlug ? " active" : "");
+        button.innerHTML = `<strong>${item.title}</strong><div class="slug">${item.slug}</div>`;
+        button.onclick = () => loadProblem(item.slug);
+        list.appendChild(button);
+      }
+    }
+
+    async function loadProblem(slug) {
+      const data = await api(`/api/problems/${encodeURIComponent(slug)}`);
+      fillForm(data);
+      setStatus(`Đã mở bài ${slug}.`);
+      await loadProblems();
+    }
+
+    async function saveProblem() {
+      const body = readForm();
+      const method = selectedSlug && selectedSlug === body.slug ? "PUT" : "POST";
+      const path = method === "PUT" ? `/api/problems/${encodeURIComponent(body.slug)}` : "/api/problems";
+      const data = await api(path, { method, body: JSON.stringify(body) });
+      fillForm(data);
+      setStatus(data);
+      await loadProblems();
+    }
+
+    async function refreshProblem() {
+      const slug = $("slug").value.trim();
+      if (!slug) throw new Error("Cần slug trước khi refresh.");
+      const data = await api(`/api/problems/${encodeURIComponent(slug)}/refresh`, { method: "POST", body: "{}" });
+      setStatus(data);
+    }
+
+    async function deleteProblem() {
+      const slug = $("slug").value.trim();
+      if (!slug) throw new Error("Cần slug để xóa.");
+      await api(`/api/problems/${encodeURIComponent(slug)}`, { method: "DELETE", body: "{}" });
+      fillForm({});
+      setStatus(`Đã xóa ${slug}.`);
+      await loadProblems();
+    }
+
+    async function submitCode() {
+      const slug = $("submitSlug").value.trim();
+      const data = await api(`/api/problems/${encodeURIComponent(slug)}/submit`, {
+        method: "POST",
+        body: JSON.stringify({
+          participant: $("participant").value.trim() || "anonymous",
+          source_code: $("sourceCode").value
+        })
+      });
+      setStatus(data);
+    }
+
+    document.querySelectorAll(".tab").forEach((tab) => {
+      tab.onclick = () => {
+        document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
+        tab.classList.add("active");
+        $("teacherTab").hidden = tab.dataset.tab !== "teacher";
+        $("studentTab").hidden = tab.dataset.tab !== "student";
+        $("guideTab").hidden = tab.dataset.tab !== "guide";
+      };
+    });
+
+    $("newProblem").onclick = () => fillForm({});
+    $("reload").onclick = () => loadProblems().catch((e) => setStatus(e.message));
+    $("saveProblem").onclick = () => saveProblem().catch((e) => setStatus(e.message));
+    $("refreshProblem").onclick = () => refreshProblem().catch((e) => setStatus(e.message));
+    $("deleteProblem").onclick = () => deleteProblem().catch((e) => setStatus(e.message));
+    $("submitCode").onclick = () => submitCode().catch((e) => setStatus(e.message));
+    $("loadExample").onclick = () => { fillForm(example); setStatus("Đã nạp ví dụ A+B. Bấm Lưu bài rồi Refresh testcase."); };
+    $("loadSolution").onclick = () => { $("sourceCode").value = solution; };
+
+    fillForm(example);
+    $("sourceCode").value = solution;
+    loadProblems().catch((e) => setStatus(e.message));
+  </script>
+</body>
+</html>
