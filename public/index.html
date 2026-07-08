@@ -733,20 +733,46 @@ int main() {
     }
 
     async function saveProblem() {
-      const body = readForm();
-      const method = selectedSlug && selectedSlug === body.slug ? "PUT" : "POST";
-      const path = method === "PUT" ? `/api/problems/${encodeURIComponent(body.slug)}` : "/api/problems";
-      const data = await api(path, { method, body: JSON.stringify(body) }, `${method === "PUT" ? "Cập nhật" : "Tạo"} bài ${body.slug || "(chưa có slug)"}`);
-      fillForm(data);
+      const btn = $("saveProblem");
+      if (btn.disabled) return;
+      btn.disabled = true;
+      const originalText = btn.textContent;
+      btn.textContent = "Đang lưu...";
+
+      try {
+        const body = readForm();
+        const method = selectedSlug && selectedSlug === body.slug ? "PUT" : "POST";
+        const path = method === "PUT" ? `/api/problems/${encodeURIComponent(body.slug)}` : "/api/problems";
+        const data = await api(path, { method, body: JSON.stringify(body) }, `${method === "PUT" ? "Cập nhật" : "Tạo"} bài ${body.slug || "(chưa có slug)"}`);
+        fillForm(data);
       showResult(data);
       await loadProblems(true);
+      } finally {
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.textContent = originalText;
+        }, 5000);
+    }
     }
 
     async function refreshProblem() {
-      const slug = $("slug").value.trim();
-      if (!slug) throw new Error("Cần slug trước khi refresh.");
-      const data = await api(`/api/problems/${encodeURIComponent(slug)}/refresh`, { method: "POST", body: "{}" }, `Refresh testcase cho ${slug}`);
-      showResult(data);
+      const btn = $("refreshProblem");
+      if (btn.disabled) return;
+      btn.disabled = true;
+      const originalText = btn.textContent;
+      btn.textContent = "Đang refresh...";
+
+      try {
+        const slug = $("slug").value.trim();
+        if (!slug) throw new Error("Cần slug trước khi refresh.");
+        const data = await api(`/api/problems/${encodeURIComponent(slug)}/refresh`, { method: "POST", body: "{}" }, `Refresh testcase cho ${slug}`);
+        showResult(data);
+      } finally {
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.textContent = originalText;
+        }, 5000);
+      }
     }
 
     async function deleteProblem() {

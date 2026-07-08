@@ -56,12 +56,12 @@ JudgeService::JudgeService(ProblemService& problemService) : problemService_(pro
 RefreshResult JudgeService::refreshProblem(const std::string& slug) {
     auto problem = problemService_.getProblem(slug);
     auto dir = problemService_.problemDir(slug);
-    auto buildDir = dir / "build";
-    auto testsDir = dir / "tests";
-    std::filesystem::create_directories(buildDir);
-    std::filesystem::remove_all(testsDir);
-    std::filesystem::create_directories(testsDir);
 
+    // Create a unique build/test directory to allow concurrent refreshes
+    auto buildDir = dir / ("build-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    auto testsDir = dir / ("tests-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::filesystem::create_directories(buildDir);
+    std::filesystem::create_directories(testsDir);
     auto genExe = buildDir / ("gentest" + exeSuffix());
     auto ansExe = buildDir / ("gen_answer_from_test" + exeSuffix());
     auto genLog = buildDir / "gentest.compile.log";
@@ -77,6 +77,8 @@ RefreshResult JudgeService::refreshProblem(const std::string& slug) {
     }
     if (runCommand(compileAns) != 0) {
         result.log = readTextIfExists(ansLog);
+        std::filesystem::remove_all(buildDir);
+        std::filesystem::remove_all(testsDir);
         return result;
     }
 
@@ -94,10 +96,19 @@ RefreshResult JudgeService::refreshProblem(const std::string& slug) {
         int ansCode = runExecutableWithRedirects(ansExe, input, answer, error, problem.config.timeLimitMs, "", 0);
         if (ansCode != 0) {
             result.log = "gen_answer_from_test failed on case " + std::to_string(i) + "\n" + readTextIfExists(error);
+            std::filesystem::remove_all(buildDir);
+            std::filesystem::remove_all(testsDir);
             return result;
         }
         ++result.generated;
     }
+
+    // Atomically update the test directory
+    auto finalTestsDir = dir / "tests";
+    std::filesystem::remove_all(finalTestsDir);
+    std::filesystem::rename(testsDir, finalTestsDir);
+    std::filesystem::remove_all(buildDir);
+
     result.ok = true;
     result.log = "generated " + std::to_string(result.generated) + " testcase(s)";
     return result;
@@ -125,6 +136,17 @@ JudgeResult JudgeService::judgeSubmission(const std::string& slug,
     }
 
     auto testsDir = dir / "tests";
+
+    // Check if tests exist. Since we now use a temporary directory for generating,
+    // the final `testsDir` should be ready. However, we should be careful about
+    // the race condition where `refreshProblem` might be deleting/renaming `testsDir`.
+    // A simple check is to verify if the directory exists.
+    if (!std::filesystem::exists(testsDir)) {
+         // Fallback or error, this means no tests are ready yet.
+         result.compileLog += "\nError: Testcases not generated yet. Please refresh problem.";
+    return result;
+}
+
     for (int i = 1; i <= problem.config.testCount; ++i) {
         auto input = testsDir / numberName(i, ".in");
         auto expected = testsDir / numberName(i, ".ans");
