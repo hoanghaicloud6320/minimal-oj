@@ -72,6 +72,12 @@ int main() {
 
 The judge compiles the source with `g++ -std=c++20 -O2`, runs it against all generated tests, and token-compares stdout with `.ans` files.
 
+Each submit is recorded in SQLite with participant, problem slug, score, verdict, timestamp, and the full judge result JSON. Teachers can view recent submissions through:
+
+```text
+GET /api/submissions/recent?limit=25
+```
+
 ## Trust Model
 
 This system assumes internal, trusted participants. Submitted code and generator code are executed directly on the server machine. This is convenient for teaching, but not appropriate for untrusted public submissions.

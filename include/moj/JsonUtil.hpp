@@ -93,6 +93,21 @@ inline Json::Value judgeResultToJson(const JudgeResult& result) {
     return root;
 }
 
+inline Json::Value submissionSummaryToJson(const SubmissionSummary& submission) {
+    Json::Value root;
+    root["id"] = Json::Int64(submission.id);
+    root["problem_slug"] = submission.problemSlug;
+    root["participant"] = submission.participant;
+    root["passed"] = submission.passed;
+    root["total"] = submission.total;
+    root["verdict"] = submission.verdict;
+    root["submitted_at"] = submission.submittedAt;
+    if (!submission.resultJson.empty()) {
+        root["result"] = parseJson(submission.resultJson);
+    }
+    return root;
+}
+
 inline Json::Value refreshResultToJson(const RefreshResult& result) {
     Json::Value root;
     root["ok"] = result.ok;

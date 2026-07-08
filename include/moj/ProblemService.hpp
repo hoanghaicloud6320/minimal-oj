@@ -19,6 +19,8 @@ public:
     ProblemBundle saveProblem(const ProblemBundle& bundle);
     void deleteProblem(const std::string& slug);
     std::filesystem::path problemDir(const std::string& slug) const;
+    long long recordSubmission(const SubmissionSummary& submission);
+    std::vector<SubmissionSummary> listRecentSubmissions(int limit) const;
 
 private:
     ProblemRepository& repository_;

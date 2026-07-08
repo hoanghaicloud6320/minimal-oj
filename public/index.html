@@ -161,6 +161,54 @@
       min-height: 44px;
       overflow: auto;
     }
+    .term-line { display: block; }
+    .term-muted { color: #98a2b3; }
+    .term-info { color: #93c5fd; }
+    .term-success { color: #86efac; }
+    .term-error { color: #fca5a5; }
+    .term-warn { color: #fcd34d; }
+    .term-json { color: #e0e7ff; }
+    .term-label { color: #c7d2fe; }
+    .submission-list {
+      display: grid;
+      gap: 8px;
+    }
+    .submission-item {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #fff;
+      display: grid;
+      gap: 6px;
+    }
+    .submission-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+    .verdict {
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 800;
+      background: #eef2f6;
+      color: #344054;
+    }
+    .verdict-ac { background: #dcfae6; color: var(--ok); }
+    .verdict-wa, .verdict-ce { background: #fee4e2; color: var(--danger); }
+    .verdict-tle, .verdict-rte { background: #fef0c7; color: var(--warn); }
+    .submission-meta {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .submission-cases {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+      font-size: 12px;
+    }
     .guide {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -211,12 +259,12 @@
 
     <section>
       <div class="tabs">
-        <button class="tab active" data-tab="teacher">Giáo viên</button>
-        <button class="tab" data-tab="student">Học viên</button>
+        <button class="tab" data-tab="teacher">Giáo viên</button>
+        <button class="tab active" data-tab="student">Học viên</button>
         <button class="tab" data-tab="guide">Workflow</button>
       </div>
 
-      <div id="teacherTab">
+      <div id="teacherTab" hidden>
         <div class="panel">
           <h2>CRUD bài</h2>
           <div class="grid">
@@ -248,9 +296,16 @@
             <button id="loadExample">Nạp ví dụ A+B</button>
           </div>
         </div>
+        <div class="panel">
+          <h2>Submit mới nhất</h2>
+          <div class="actions">
+            <button id="reloadSubmissions">Tải submit mới</button>
+          </div>
+          <div id="submissionList" class="submission-list"></div>
+        </div>
       </div>
 
-      <div id="studentTab" hidden>
+      <div id="studentTab">
         <div class="panel">
           <h2>Nộp bài</h2>
           <div class="grid">
@@ -339,6 +394,27 @@ int main() {
     cout << a + b << '\\n';
 }`;
 
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function toneClass(tone) {
+      return {
+        muted: "term-muted",
+        info: "term-info",
+        success: "term-success",
+        error: "term-error",
+        warn: "term-warn",
+        json: "term-json",
+        label: "term-label"
+      }[tone || ""] || "";
+    }
+
     function formatValue(value) {
       return typeof value === "string" ? value : JSON.stringify(value, null, 2);
     }
@@ -348,26 +424,80 @@ int main() {
     }
 
     function renderStatus(extra = "") {
-      statusBox.textContent = statusLines.join("\n") + (extra ? `\n${extra}` : "");
+      const lines = statusLines.map((line) => {
+        const text = typeof line === "string" ? line : line.text;
+        const tone = typeof line === "string" ? "" : line.tone;
+        return `<span class="term-line ${toneClass(tone)}">${escapeHtml(text)}</span>`;
+      });
+      statusBox.innerHTML = lines.join("") + extra;
     }
 
-    function setStatus(value) {
-      statusLines = [`[${nowText()}] ${formatValue(value)}`];
+    function setStatus(value, tone = "info") {
+      statusLines = [{ text: `[${nowText()}] ${formatValue(value)}`, tone }];
       renderStatus();
     }
 
-    function appendStatus(message) {
-      statusLines.push(`[${nowText()}] ${message}`);
+    function appendStatus(message, tone = "info") {
+      statusLines.push({ text: `[${nowText()}] ${message}`, tone });
       renderStatus();
     }
 
     function showResult(value) {
-      renderStatus(`\nKết quả:\n${formatValue(value)}`);
+      renderStatus(renderResult(value));
+    }
+
+    function verdictTone(item) {
+      if (item.accepted) return "success";
+      const message = (item.message || "").toLowerCase();
+      if (message.includes("time limit") || message.includes("runtime error")) return "warn";
+      if (message.includes("wrong answer") || message.includes("missing testcase")) return "error";
+      return "info";
+    }
+
+    function verdictLabel(item) {
+      if (item.accepted) return "AC";
+      const message = (item.message || "").toLowerCase();
+      if (message.includes("time limit")) return "TLE";
+      if (message.includes("runtime error")) return "RTE";
+      if (message.includes("wrong answer")) return "WA";
+      return "FAIL";
+    }
+
+    function verdictClass(verdict) {
+      return `verdict-${String(verdict || "").toLowerCase()}`;
+    }
+
+    function renderResult(value) {
+      const html = ['<span class="term-line term-label"></span>', '<span class="term-line term-label">Kết quả:</span>'];
+      if (value && Array.isArray(value.cases)) {
+        const summaryTone = value.compiled && value.passed === value.total ? "success" : "error";
+        html.push(`<span class="term-line ${toneClass(summaryTone)}">score: ${escapeHtml(value.passed)}/${escapeHtml(value.total)}${value.compiled ? "" : " | compile failed"}</span>`);
+        if (value.compile_log) {
+          html.push(`<span class="term-line ${toneClass("warn")}">compile log:</span>`);
+          for (const line of value.compile_log.trimEnd().split("\n")) {
+            html.push(`<span class="term-line ${toneClass("warn")}">  ${escapeHtml(line)}</span>`);
+          }
+        }
+        for (const item of value.cases) {
+          const tone = verdictTone(item);
+          const label = verdictLabel(item);
+          html.push(`<span class="term-line ${toneClass(tone)}">case ${String(item.index).padStart(3, "0")}: ${label} | exit=${escapeHtml(item.exit_code)} | ${escapeHtml(item.message || "")}</span>`);
+        }
+        return html.join("");
+      }
+      if (value && typeof value === "object" && Object.prototype.hasOwnProperty.call(value, "ok")) {
+        html.push(`<span class="term-line ${toneClass(value.ok ? "success" : "error")}">ok: ${escapeHtml(value.ok)}</span>`);
+        html.push(`<span class="term-line ${toneClass(value.ok ? "json" : "error")}">${escapeHtml(JSON.stringify(value, null, 2))}</span>`);
+        return html.join("");
+      }
+      const tone = typeof value === "string" ? "success" : "json";
+      html.push(`<span class="term-line ${toneClass(tone)}">${escapeHtml(formatValue(value))}</span>`);
+      return html.join("");
     }
 
     function handleError(error) {
       if (!error.logged) {
-        appendStatus(`Lỗi: ${error.message || error}`);
+        appendStatus(`Lỗi: ${error.message || error}`, "error");
       }
     }
 
@@ -377,9 +507,9 @@ int main() {
       const requestId = ++requestSeq;
       const started = performance.now();
       if (log) {
-        statusLines = [`[${nowText()}] #${requestId} ${label}`];
-        appendStatus(`Đã gửi: ${method} ${path}`);
-        appendStatus("Đang đợi server trả lời...");
+        statusLines = [{ text: `[${nowText()}] #${requestId} ${label}`, tone: "label" }];
+        appendStatus(`Đã gửi: ${method} ${path}`, "info");
+        appendStatus("Đang đợi server trả lời...", "warn");
       }
       try {
         const res = await fetch(path, {
@@ -390,18 +520,18 @@ int main() {
         const json = text ? JSON.parse(text) : {};
         const elapsed = Math.round(performance.now() - started);
         if (log) {
-          appendStatus(`Server trả lời: HTTP ${res.status} sau ${elapsed}ms`);
+          appendStatus(`Server trả lời: HTTP ${res.status} sau ${elapsed}ms`, res.ok ? "success" : "error");
         }
         if (!res.ok) {
           throw new Error(json.error || res.statusText);
         }
         if (log) {
-          appendStatus("Hoàn tất.");
+          appendStatus("Hoàn tất.", "success");
         }
         return json;
       } catch (error) {
         if (log) {
-          appendStatus(`Lỗi request: ${error.message || error}`);
+          appendStatus(`Lỗi request: ${error.message || error}`, "error");
           error.logged = true;
         }
         throw error;
@@ -490,6 +620,40 @@ int main() {
         })
       }, `Submit bài ${slug}`);
       showResult(data);
+      await loadRecentSubmissions(true);
+    }
+
+    async function loadRecentSubmissions(silent = false) {
+      const data = await api("/api/submissions/recent?limit=25", { log: !silent }, "Tải submit mới nhất");
+      const list = $("submissionList");
+      if (!list) return;
+      list.innerHTML = "";
+      if (!data.submissions.length) {
+        list.innerHTML = "<p>Chưa có submit nào.</p>";
+        return;
+      }
+      for (const item of data.submissions) {
+        const result = item.result || {};
+        const cases = Array.isArray(result.cases) ? result.cases : [];
+        const row = document.createElement("div");
+        row.className = "submission-item";
+        const caseHtml = cases.map((test) => {
+          const label = verdictLabel(test);
+          const tone = label === "AC" ? "verdict-ac" : label === "WA" || label === "FAIL" ? "verdict-wa" : "verdict-tle";
+          return `<span class="verdict ${tone}">#${escapeHtml(test.index)} ${escapeHtml(label)}</span>`;
+        }).join("");
+        row.innerHTML = `
+          <div class="submission-head">
+            <span class="verdict ${verdictClass(item.verdict)}">${escapeHtml(item.verdict)}</span>
+            <strong>${escapeHtml(item.problem_slug)}</strong>
+            <span>${escapeHtml(item.participant)}</span>
+            <span class="submission-meta">score ${escapeHtml(item.passed)}/${escapeHtml(item.total)}</span>
+          </div>
+          <div class="submission-meta">#${escapeHtml(item.id)} · ${escapeHtml(item.submitted_at)}</div>
+          <div class="submission-cases">${caseHtml || '<span class="submission-meta">Không có case detail.</span>'}</div>
+        `;
+        list.appendChild(row);
+      }
     }
 
     document.querySelectorAll(".tab").forEach((tab) => {
@@ -499,6 +663,9 @@ int main() {
         $("teacherTab").hidden = tab.dataset.tab !== "teacher";
         $("studentTab").hidden = tab.dataset.tab !== "student";
         $("guideTab").hidden = tab.dataset.tab !== "guide";
+        if (tab.dataset.tab === "teacher") {
+          loadRecentSubmissions(true).catch(handleError);
+        }
       };
     });
 
@@ -508,6 +675,7 @@ int main() {
     $("refreshProblem").onclick = () => refreshProblem().catch(handleError);
     $("deleteProblem").onclick = () => deleteProblem().catch(handleError);
     $("submitCode").onclick = () => submitCode().catch(handleError);
+    $("reloadSubmissions").onclick = () => loadRecentSubmissions().catch(handleError);
     $("loadExample").onclick = () => { fillForm(example); setStatus("Đã nạp ví dụ A+B. Bấm Lưu bài rồi Refresh testcase."); };
     $("loadSolution").onclick = () => { $("sourceCode").value = solution; };
 

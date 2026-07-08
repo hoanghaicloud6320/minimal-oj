@@ -44,6 +44,17 @@ struct JudgeResult {
     std::vector<CaseResult> cases;
 };
 
+struct SubmissionSummary {
+    long long id = 0;
+    std::string problemSlug;
+    std::string participant;
+    int passed = 0;
+    int total = 0;
+    std::string verdict;
+    std::string submittedAt;
+    std::string resultJson;
+};
+
 struct RefreshResult {
     bool ok = false;
     int generated = 0;

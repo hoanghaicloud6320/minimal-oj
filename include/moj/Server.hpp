@@ -21,12 +21,14 @@ public:
     static drogon::Task<drogon::HttpResponsePtr> deleteProblem(drogon::HttpRequestPtr req, std::string slug);
     static drogon::Task<drogon::HttpResponsePtr> refreshProblem(drogon::HttpRequestPtr req, std::string slug);
     static drogon::Task<drogon::HttpResponsePtr> submit(drogon::HttpRequestPtr req, std::string slug);
+    static drogon::Task<drogon::HttpResponsePtr> listRecentSubmissions(drogon::HttpRequestPtr req);
 
 private:
     static ProblemService* problemService_;
     static JudgeService* judgeService_;
 
     static ProblemBundle bundleFromJson(const Json::Value& root, const std::string& fallbackSlug = {});
+    static std::string verdictFor(const JudgeResult& result);
     static drogon::HttpResponsePtr jsonResponse(const Json::Value& value,
                                                 drogon::HttpStatusCode status = drogon::k200OK);
     static drogon::HttpResponsePtr errorResponse(const std::string& message,

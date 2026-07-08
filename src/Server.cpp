@@ -43,6 +43,9 @@ void Server::registerRoutes() {
     drogon::app().registerHandler("/api/problems/{1}/submit", [](drogon::HttpRequestPtr req, std::string slug) -> drogon::Task<drogon::HttpResponsePtr> {
         co_return co_await Server::submit(std::move(req), std::move(slug));
     }, {drogon::Post});
+    drogon::app().registerHandler("/api/submissions/recent", [](drogon::HttpRequestPtr req) -> drogon::Task<drogon::HttpResponsePtr> {
+        co_return co_await Server::listRecentSubmissions(std::move(req));
+    }, {drogon::Get});
 }
 
 drogon::Task<drogon::HttpResponsePtr> Server::index(drogon::HttpRequestPtr) {
@@ -133,7 +136,38 @@ drogon::Task<drogon::HttpResponsePtr> Server::submit(drogon::HttpRequestPtr req,
         if (source.empty()) {
             throw std::runtime_error("source_code is required");
         }
-        co_return jsonResponse(judgeResultToJson(judgeService_->judgeSubmission(slug, participant, source)));
+        auto result = judgeService_->judgeSubmission(slug, participant, source);
+        auto resultJson = judgeResultToJson(result);
+        SubmissionSummary submission;
+        submission.problemSlug = slug;
+        submission.participant = participant.empty() ? "anonymous" : participant;
+        submission.passed = result.passed;
+        submission.total = result.total;
+        submission.verdict = verdictFor(result);
+        submission.resultJson = jsonToString(resultJson);
+        submission.id = problemService_->recordSubmission(submission);
+        resultJson["submission_id"] = Json::Int64(submission.id);
+        resultJson["verdict"] = submission.verdict;
+        co_return jsonResponse(resultJson);
+    } catch (const std::exception& error) {
+        co_return errorResponse(error.what());
+    }
+}
+
+drogon::Task<drogon::HttpResponsePtr> Server::listRecentSubmissions(drogon::HttpRequestPtr req) {
+    try {
+        int limit = 25;
+        auto limitText = req->getParameter("limit");
+        if (!limitText.empty()) {
+            limit = std::stoi(limitText);
+        }
+        Json::Value items(Json::arrayValue);
+        for (const auto& submission : problemService_->listRecentSubmissions(limit)) {
+            items.append(submissionSummaryToJson(submission));
+        }
+        Json::Value root;
+        root["submissions"] = items;
+        co_return jsonResponse(root);
     } catch (const std::exception& error) {
         co_return errorResponse(error.what());
     }
@@ -155,6 +189,24 @@ ProblemBundle Server::bundleFromJson(const Json::Value& root, const std::string&
     bundle.genTestCpp = root.get("gentest_cpp", "").asString();
     bundle.genAnswerCpp = root.get("gen_answer_from_test_cpp", "").asString();
     return bundle;
+}
+
+std::string Server::verdictFor(const JudgeResult& result) {
+    if (!result.compiled) {
+        return "CE";
+    }
+    if (result.total > 0 && result.passed == result.total) {
+        return "AC";
+    }
+    for (const auto& item : result.cases) {
+        if (item.exitCode == 124) {
+            return "TLE";
+        }
+        if (item.exitCode != 0) {
+            return "RTE";
+        }
+    }
+    return "WA";
 }
 
 drogon::HttpResponsePtr Server::jsonResponse(const Json::Value& value, drogon::HttpStatusCode status) {

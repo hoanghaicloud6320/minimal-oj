@@ -87,6 +87,15 @@ std::filesystem::path ProblemService::problemDir(const std::string& slug) const 
     return problemsDir_ / slug;
 }
 
+long long ProblemService::recordSubmission(const SubmissionSummary& submission) {
+    validateSlug(submission.problemSlug);
+    return repository_.recordSubmission(submission);
+}
+
+std::vector<SubmissionSummary> ProblemService::listRecentSubmissions(int limit) const {
+    return repository_.listRecentSubmissions(limit);
+}
+
 void ProblemService::validateSlug(const std::string& slug) {
     static const std::regex pattern("^[a-z0-9][a-z0-9_-]{0,63}$");
     if (!std::regex_match(slug, pattern)) {

@@ -24,6 +24,8 @@ public:
     void deleteProblem(const std::string& slug);
     std::vector<ProblemSummary> listProblems() const;
     std::optional<ProblemSummary> findProblem(const std::string& slug) const;
+    long long recordSubmission(const SubmissionSummary& submission);
+    std::vector<SubmissionSummary> listRecentSubmissions(int limit) const;
 
 private:
     sqlite3* db_ = nullptr;

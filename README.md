@@ -60,5 +60,6 @@ data/
 - `DELETE /api/problems/{slug}`
 - `POST /api/problems/{slug}/refresh`
 - `POST /api/problems/{slug}/submit`
+- `GET /api/submissions/recent?limit=25`
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for boundaries and contracts.
