@@ -301,6 +301,7 @@
     <section>
       <div class="tabs">
         <button class="tab" data-tab="teacher">Giáo viên</button>
+        <button class="tab" data-tab="submissions">Submissions</button>
         <button class="tab active" data-tab="student">Học viên</button>
         <button class="tab" data-tab="guide">Workflow</button>
       </div>
@@ -337,6 +338,9 @@
             <button id="loadExample">Nạp ví dụ A+B</button>
           </div>
         </div>
+      </div>
+
+      <div id="submissionsTab" hidden>
         <div class="panel">
           <h2>Submit mới nhất</h2>
           <div class="actions">
@@ -805,9 +809,10 @@ int main() {
         document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
         tab.classList.add("active");
         $("teacherTab").hidden = tab.dataset.tab !== "teacher";
+        $("submissionsTab").hidden = tab.dataset.tab !== "submissions";
         $("studentTab").hidden = tab.dataset.tab !== "student";
         $("guideTab").hidden = tab.dataset.tab !== "guide";
-        if (tab.dataset.tab === "teacher") {
+        if (tab.dataset.tab === "submissions") {
           loadRecentSubmissions(true).catch(handleError);
         }
       };
@@ -829,3 +834,4 @@ int main() {
   </script>
 </body>
 </html>
+
