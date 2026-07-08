@@ -26,6 +26,19 @@ Refreshing a problem recompiles the generators and recreates all testcases. Stud
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 .\build\minimal_oj.exe
+
+## Problem Workflow
+
+Each problem is represented by:
+
+- `config.json`: test count, time limit, memory limit
+- `statement.md`: problem statement
+- `gentest.cpp`: generates one test. The judge passes the test index as `argv[1]` and the total number of tests as `argv[2]`.
+- `gen_answer_from_test.cpp`: reads a generated test from stdin and writes the expected answer.
+
+### Using `argv` in `gentest.cpp`
+
+You can use the passed arguments to generate different types of tests or implement subtasks:
 ```
 
 Open <http://localhost:3335>.

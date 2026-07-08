@@ -26,7 +26,8 @@ private:
                                           const std::filesystem::path& output,
                                           const std::filesystem::path& error,
                                           int timeLimitMs,
-                                          const std::string& argument = {});
+                                          const std::string& argument = {},
+                                          int testCount = 0);
     static std::string quote(const std::filesystem::path& path);
     static std::string quoteString(const std::string& value);
     static std::string powershellLiteral(const std::string& value);
@@ -37,3 +38,4 @@ private:
 };
 
 } // namespace moj
+
