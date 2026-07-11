@@ -120,6 +120,14 @@ JudgeResult JudgeService::judgeSubmission(const std::string& slug,
     auto problem = problemService_.getProblem(slug);
     auto dir = problemService_.problemDir(slug);
     auto runDir = uniqueRunDir(dir, safeName(participant.empty() ? "anonymous" : participant));
+    
+    // Ensure cleanup of run directory
+    struct RunDirGuard {
+        std::filesystem::path p;
+        RunDirGuard(std::filesystem::path path) : p(std::move(path)) {}
+        ~RunDirGuard() { if (!p.empty()) std::filesystem::remove_all(p); }
+    } runDirGuard(runDir);
+
     auto source = runDir / "main.cpp";
     auto exe = runDir / ("main" + exeSuffix());
     auto compileLog = runDir / "compile.log";
