@@ -5,6 +5,7 @@
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
+#include <thread>
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -125,7 +126,15 @@ JudgeResult JudgeService::judgeSubmission(const std::string& slug,
     struct RunDirGuard {
         std::filesystem::path p;
         RunDirGuard(std::filesystem::path path) : p(std::move(path)) {}
-        ~RunDirGuard() { if (!p.empty()) std::filesystem::remove_all(p); }
+        ~RunDirGuard() {
+            if (p.empty()) return;
+            for (int i = 0; i < 5; ++i) {
+                std::error_code ec;
+                std::filesystem::remove_all(p, ec);
+                if (!ec) break;
+                std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            }
+        }
     } runDirGuard(runDir);
 
     auto source = runDir / "main.cpp";
