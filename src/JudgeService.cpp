@@ -179,6 +179,8 @@ JudgeResult JudgeService::judgeSubmission(const std::string& slug,
         row.exitCode = runExecutableWithRedirects(exe, input, actual, error, problem.config.timeLimitMs, problem.config.memoryLimitMb, "", 0);
         if (row.exitCode == 124) {
             row.message = "time limit exceeded";
+        } else if (row.exitCode == 256) {
+            row.message = "memory limit exceeded";
         } else if (row.exitCode != 0) {
             row.message = "runtime error: " + readTextIfExists(error);
         } else if (sameTokens(actual, expected)) {
@@ -305,6 +307,27 @@ int JudgeService::runExecutableWithRedirects(const std::filesystem::path& execut
         GetExitCodeProcess(process.hProcess, &exitCode);
     }
 
+    // Kiểm tra xem tiến trình có bị kết thúc bởi JobObject (do vi phạm giới hạn)
+    // Trên Windows, khi một tiến trình bị terminate do Job, exitCode thường là 1 (hoặc mã terminate)
+    // Chúng ta cần một cách để phân biệt giữa RTE thông thường và Memory Limit Exceeded.
+    // Cách đơn giản nhất là kiểm tra xem bộ nhớ thực tế có vượt quá giới hạn không, 
+    // nhưng để nhận biết ngay khi kết thúc, ta có thể kiểm tra trạng thái Job.
+    
+    // Một cách phổ biến là kiểm tra xem tiến trình đã thực sự thoát sau khi quá hạn bộ nhớ.
+    // Nếu exit code là 1 và job bị vi phạm, ta có thể giả định MLE.
+    
+    BOOL isProcessInJob = FALSE;
+    IsProcessInJob(process.hProcess, hJob, &isProcessInJob);
+    if (isProcessInJob) {
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION jeli = {0};
+        if (QueryInformationJobObject(hJob, JobObjectExtendedLimitInformation, &jeli, sizeof(jeli), nullptr)) {
+            // Kiểm tra xem bộ nhớ đã chạm ngưỡng chưa
+            if (jeli.PeakProcessMemoryUsed >= (SIZE_T)memoryLimitMb * 1024 * 1024) {
+                exitCode = 256; // Sử dụng một mã riêng cho MLE
+            }
+        }
+    }
+
     CloseHandle(process.hThread);
     CloseHandle(process.hProcess);
     CloseHandle(hJob);
@@ -400,6 +423,7 @@ std::string JudgeService::safeName(const std::string& value) {
 
 std::string JudgeService::exitCodeMessage(int code) {
     if (code == 124) return "TLE (Time Limit Exceeded)";
+    if (code == 256) return "MLE (Memory Limit Exceeded)";
     return "RTE (Runtime Error) - Exit Code: " + std::to_string(code);
 }
 
