@@ -89,12 +89,12 @@ RefreshResult JudgeService::refreshProblem(const std::string& slug) {
         auto error = testsDir / numberName(i, ".err");
         auto empty = testsDir / "_empty.in";
         writeText(empty, "");
-        int genCode = runExecutableWithRedirects(genExe, empty, input, error, problem.config.timeLimitMs, std::to_string(i), problem.config.testCount);
+        int genCode = runExecutableWithRedirects(genExe, empty, input, error, problem.config.timeLimitMs, problem.config.memoryLimitMb, std::to_string(i), problem.config.testCount);
         if (genCode != 0) {
             result.log = "gentest failed on case " + std::to_string(i) + ": " + exitCodeMessage(genCode) + "\n" + readTextIfExists(error);
             return result;
         }
-        int ansCode = runExecutableWithRedirects(ansExe, input, answer, error, problem.config.timeLimitMs, "", 0);
+        int ansCode = runExecutableWithRedirects(ansExe, input, answer, error, problem.config.timeLimitMs, problem.config.memoryLimitMb, "", 0);
         if (ansCode != 0) {
             result.log = "gen_answer_from_test failed on case " + std::to_string(i) + ": " + exitCodeMessage(ansCode) + "\n" + readTextIfExists(error);
             std::filesystem::remove_all(buildDir);
@@ -176,7 +176,7 @@ JudgeResult JudgeService::judgeSubmission(const std::string& slug,
             result.cases.push_back(row);
             continue;
         }
-        row.exitCode = runExecutableWithRedirects(exe, input, actual, error, problem.config.timeLimitMs, "", 0);
+        row.exitCode = runExecutableWithRedirects(exe, input, actual, error, problem.config.timeLimitMs, problem.config.memoryLimitMb, "", 0);
         if (row.exitCode == 124) {
             row.message = "time limit exceeded";
         } else if (row.exitCode != 0) {
@@ -203,6 +203,7 @@ int JudgeService::runExecutableWithRedirects(const std::filesystem::path& execut
                                              const std::filesystem::path& output,
                                              const std::filesystem::path& error,
                                              int timeLimitMs,
+                                             int memoryLimitMb,
                                              const std::string& argument,
                                              int testCount) {
 #ifdef _WIN32
@@ -210,6 +211,14 @@ int JudgeService::runExecutableWithRedirects(const std::filesystem::path& execut
     security.nLength = sizeof(SECURITY_ATTRIBUTES);
     security.lpSecurityDescriptor = nullptr;
     security.bInheritHandle = TRUE;
+
+    HANDLE hJob = CreateJobObjectW(nullptr, nullptr);
+    if (!hJob) return 1;
+
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION jeli = {0};
+    jeli.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_PROCESS_MEMORY;
+    jeli.ProcessMemoryLimit = (SIZE_T)memoryLimitMb * 1024 * 1024;
+    SetInformationJobObject(hJob, JobObjectExtendedLimitInformation, &jeli, sizeof(jeli));
 
     HANDLE inputHandle = CreateFileW(input.wstring().c_str(),
                                      GENERIC_READ,
@@ -233,15 +242,10 @@ int JudgeService::runExecutableWithRedirects(const std::filesystem::path& execut
                                      FILE_ATTRIBUTE_NORMAL,
                                      nullptr);
     if (inputHandle == INVALID_HANDLE_VALUE || outputHandle == INVALID_HANDLE_VALUE || errorHandle == INVALID_HANDLE_VALUE) {
-        if (inputHandle != INVALID_HANDLE_VALUE) {
-            CloseHandle(inputHandle);
-        }
-        if (outputHandle != INVALID_HANDLE_VALUE) {
-            CloseHandle(outputHandle);
-        }
-        if (errorHandle != INVALID_HANDLE_VALUE) {
-            CloseHandle(errorHandle);
-        }
+        if (inputHandle != INVALID_HANDLE_VALUE) CloseHandle(inputHandle);
+        if (outputHandle != INVALID_HANDLE_VALUE) CloseHandle(outputHandle);
+        if (errorHandle != INVALID_HANDLE_VALUE) CloseHandle(errorHandle);
+        CloseHandle(hJob);
         return 1;
     }
 
@@ -272,15 +276,22 @@ int JudgeService::runExecutableWithRedirects(const std::filesystem::path& execut
                                   nullptr,
                                   nullptr,
                                   TRUE,
-                                  CREATE_NO_WINDOW,
+                                  CREATE_NO_WINDOW | CREATE_BREAKAWAY_FROM_JOB,
                                   nullptr,
                                   nullptr,
                                   &startup,
                                   &process);
+    
     CloseHandle(inputHandle);
     CloseHandle(outputHandle);
     CloseHandle(errorHandle);
+
+    if (created) {
+        AssignProcessToJobObject(hJob, process.hProcess);
+    }
+    
     if (!created) {
+        CloseHandle(hJob);
         return 1;
     }
 
@@ -296,8 +307,10 @@ int JudgeService::runExecutableWithRedirects(const std::filesystem::path& execut
 
     CloseHandle(process.hThread);
     CloseHandle(process.hProcess);
+    CloseHandle(hJob);
     return static_cast<int>(exitCode);
 #else
+    // TODO: Implement memory limit for non-Windows (e.g. setrlimit)
     std::string command = "timeout " + std::to_string((timeLimitMs + 999) / 1000) + "s " + quote(executable);
     if (!argument.empty()) {
         command += " " + quoteString(argument);

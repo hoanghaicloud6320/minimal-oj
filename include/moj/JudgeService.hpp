@@ -26,6 +26,7 @@ private:
                                           const std::filesystem::path& output,
                                           const std::filesystem::path& error,
                                           int timeLimitMs,
+                                          int memoryLimitMb,
                                           const std::string& argument = {},
                                           int testCount = 0);
     static std::string quote(const std::filesystem::path& path);
