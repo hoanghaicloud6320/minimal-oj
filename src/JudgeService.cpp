@@ -90,12 +90,12 @@ RefreshResult JudgeService::refreshProblem(const std::string& slug) {
         writeText(empty, "");
         int genCode = runExecutableWithRedirects(genExe, empty, input, error, problem.config.timeLimitMs, std::to_string(i), problem.config.testCount);
         if (genCode != 0) {
-            result.log = "gentest failed on case " + std::to_string(i) + "\n" + readTextIfExists(error);
+            result.log = "gentest failed on case " + std::to_string(i) + ": " + exitCodeMessage(genCode) + "\n" + readTextIfExists(error);
             return result;
         }
         int ansCode = runExecutableWithRedirects(ansExe, input, answer, error, problem.config.timeLimitMs, "", 0);
         if (ansCode != 0) {
-            result.log = "gen_answer_from_test failed on case " + std::to_string(i) + "\n" + readTextIfExists(error);
+            result.log = "gen_answer_from_test failed on case " + std::to_string(i) + ": " + exitCodeMessage(ansCode) + "\n" + readTextIfExists(error);
             std::filesystem::remove_all(buildDir);
             std::filesystem::remove_all(testsDir);
             return result;
@@ -366,6 +366,11 @@ std::string JudgeService::safeName(const std::string& value) {
         }
     }
     return out.empty() ? "anonymous" : out;
+}
+
+std::string JudgeService::exitCodeMessage(int code) {
+    if (code == 124) return "TLE (Time Limit Exceeded)";
+    return "RTE (Runtime Error) - Exit Code: " + std::to_string(code);
 }
 
 } // namespace moj

@@ -35,6 +35,7 @@ private:
     static bool sameTokens(const std::filesystem::path& actual, const std::filesystem::path& expected);
     static std::string readTextIfExists(const std::filesystem::path& path);
     static std::string safeName(const std::string& value);
+    static std::string exitCodeMessage(int code);
 };
 
 } // namespace moj
